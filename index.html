@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeTrack — Harshith's Productivity Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+
+<div id="dashboard" class="dashboard">
+
+    <!-- Top Nav -->
+    <nav class="top-nav">
+        <div class="nav-brand">
+            <i class="fas fa-code"></i>
+            <span>CodeTrack</span>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="overview"><i class="fas fa-home"></i> Overview</button>
+            <button class="nav-tab" data-tab="leetcode"><i class="fas fa-terminal"></i> LeetCode</button>
+            <button class="nav-tab" data-tab="gfg"><i class="fas fa-laptop-code"></i> GFG</button>
+            <button class="nav-tab" data-tab="productivity"><i class="fas fa-rocket"></i> Productivity</button>
+        </div>
+        <div class="nav-right">
+            <span class="welcome-msg">👋 Hey <strong>Harshith</strong></span>
+            <button class="btn-icon" id="refresh-btn" title="Refresh Data">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="btn-icon" id="settings-btn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+            <div class="last-updated" id="last-updated"></div>
+        </div>
+    </nav>
+
+    <!-- ===================== OVERVIEW TAB ===================== -->
+    <main class="main-content tab-content active" id="tab-overview">
+
+        <!-- Hero Stats -->
+        <section class="hero-stats">
+            <div class="stat-card total-card">
+                <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="total-solved">—</span>
+                    <span class="stat-label">Total Problems Solved</span>
+                </div>
+            </div>
+            <div class="stat-card streak-card">
+                <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-streak">—</span>
+                    <span class="stat-label">LeetCode Streak 🔥</span>
+                </div>
+            </div>
+            <div class="stat-card rank-card">
+                <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-ranking">—</span>
+                    <span class="stat-label">LeetCode Ranking</span>
+                </div>
+            </div>
+            <div class="stat-card coding-card">
+                <div class="stat-icon"><i class="fas fa-star"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="gfg-score">—</span>
+                    <span class="stat-label">GFG Coding Score</span>
+                </div>
+            </div>
+            <div class="stat-card active-card">
+                <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-active-days">—</span>
+                    <span class="stat-label">Active Days (LC)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Per-Platform Daily Goals -->
+        <section class="daily-goals-section">
+            <div class="section-header">
+                <h2><i class="fas fa-bullseye"></i> Daily Goals — 3 Problems Each Platform</h2>
+            </div>
+            <div class="goals-grid">
+                <div class="goal-card lc-goal-card">
+                    <div class="goal-card-header">
+                        <img src="https://img.icons8.com/external-tal-revivo-shadow-tal-revivo/48/external-level-up-your-coding-skills-and-quickly-land-a-job-logo-shadow-tal-revivo.png" alt="LC" width="28" height="28">
+                        <span>LeetCode</span>
+                        <span class="goal-count" id="lc-goal-count">0 / 3</span>
+                    </div>
+                    <div class="goal-progress-bar">
+                        <div class="goal-fill lc-fill" id="lc-goal-fill"></div>
+                    </div>
+                    <p class="goal-text" id="lc-goal-text">Solve 3 LeetCode problems today!</p>
+                </div>
+                <div class="goal-card gfg-goal-card">
+                    <div class="goal-card-header">
+                        <img src="https://img.icons8.com/color/48/GeeksforGeeks.png" alt="GFG" width="28" height="28">
+                        <span>GeeksforGeeks</span>
+                        <span class="goal-count" id="gfg-goal-count">0 / 3</span>
+                    </div>
+                    <div class="goal-progress-bar">
+                        <div class="goal-fill gfg-fill" id="gfg-goal-fill"></div>
+                    </div>
+                    <p class="goal-text" id="gfg-goal-text">Solve 3 GFG problems today!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Platform Cards side-by-side overview -->
+        <div class="platform-grid">
+            <!-- LC Mini Card -->
+            <section class="platform-card leetcode-card">
+                <div class="platform-header">
+                    <div class="platform-title">
+                        <img src="https://img.icons8.com/external-tal-revivo-shadow-tal-revivo/48/external-level-up-your-coding-skills-and-quickly-land-a-job-logo-shadow-tal-revivo.png" alt="LC" class="platform-logo">
+                        <div>
+                            <h2>LeetCode</h2>
+                            <span class="username-tag" id="lc-user-tag">@harshith1459</span>
+                        </div>
+                    </div>
+                    <button class="btn-outline" onclick="switchTab('leetcode')"><i class="fas fa-arrow-right"></i> Full Dashboard</button>
+                </div>
+                <div class="problems-breakdown">
+                    <div class="problem-ring">
+                        <canvas id="lc-ring" width="180" height="180"></canvas>
+                        <div class="ring-center">
+                            <span class="ring-value" id="lc-total">—</span>
+                            <span class="ring-label">Solved</span>
+                        </div>
+                    </div>
+                    <div class="problem-details">
+                        <div class="detail-row easy">
+                            <span class="dot"></span>
+                            <span class="detail-label">Easy</span>
+                            <span class="detail-value" id="lc-easy">—</span>
+                        </div>
+                        <div class="detail-row medium">
+                            <span class="dot"></span>
+                            <span class="detail-label">Medium</span>
+                            <span class="detail-value" id="lc-medium">—</span>
+                        </div>
+                        <div class="detail-row hard">
+                            <span class="dot"></span>
+                            <span class="detail-label">Hard</span>
+                            <span class="detail-value" id="lc-hard">—</span>
+                        </div>
+                        <hr class="detail-divider">
+                        <div class="detail-row acceptance">
+                            <span class="dot"></span>
+                            <span class="detail-label">Acceptance</span>
+                            <span class="detail-value" id="lc-acceptance">—</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="loading-overlay" id="lc-loading">
+                    <div class="spinner"></div>
+                    <p>Fetching LeetCode data...</p>
+                </div>
+                <div class="error-overlay hidden" id="lc-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Could not fetch LeetCode data.</p>
+                    <button class="btn-retry" onclick="fetchLeetCode()">Retry</button>
+                </div>
+            </section>
+
+            <!-- GFG Mini Card -->
+            <section class="platform-card gfg-card">
+                <div class="platform-header">
+                    <div class="platform-title">
+                        <img src="https://img.icons8.com/color/48/GeeksforGeeks.png" alt="GFG" class="platform-logo">
+                        <div>
+                            <h2>GeeksforGeeks</h2>
+                            <span class="username-tag" id="gfg-user-tag">@23211a6792</span>
+                        </div>
+                    </div>
+                    <button class="btn-outline" onclick="switchTab('gfg')"><i class="fas fa-arrow-right"></i> Full Dashboard</button>
+                </div>
+                <div class="problems-breakdown">
+                    <div class="problem-ring">
+                        <canvas id="gfg-ring" width="180" height="180"></canvas>
+                        <div class="ring-center">
+                            <span class="ring-value" id="gfg-total">—</span>
+                            <span class="ring-label">Solved</span>
+                        </div>
+                    </div>
+                    <div class="problem-details">
+                        <div class="detail-row easy">
+                            <span class="dot"></span>
+                            <span class="detail-label">Total Solved</span>
+                            <span class="detail-value" id="gfg-total-detail">—</span>
+                        </div>
+                        <div class="detail-row medium">
+                            <span class="dot"></span>
+                            <span class="detail-label">Coding Score</span>
+                            <span class="detail-value" id="gfg-coding-score-ov">—</span>
+                        </div>
+                        <div class="detail-row acceptance">
+                            <span class="dot"></span>
+                            <span class="detail-label">Institute Rank</span>
+                            <span class="detail-value" id="gfg-rank-ov">—</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="loading-overlay" id="gfg-loading">
+                    <div class="spinner"></div>
+                    <p>Fetching GFG data...</p>
+                </div>
+                <div class="error-overlay hidden" id="gfg-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Could not fetch GFG data.</p>
+                    <button class="btn-retry" onclick="fetchGFG()">Retry</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Progress History -->
+        <section class="history-section">
+            <div class="section-header">
+                <h2><i class="fas fa-history"></i> Progress Log</h2>
+                <button class="btn-outline" id="clear-history-btn"><i class="fas fa-trash-alt"></i> Clear</button>
+            </div>
+            <div class="history-chart-container">
+                <canvas id="history-chart" height="260"></canvas>
+            </div>
+            <div class="history-table-container">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>LC Solved</th>
+                            <th>GFG Solved</th>
+                            <th>Total</th>
+                            <th>Δ Change</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================== LEETCODE TAB ===================== -->
+    <main class="main-content tab-content" id="tab-leetcode">
+        <div class="tab-title-bar">
+            <img src="https://img.icons8.com/external-tal-revivo-shadow-tal-revivo/48/external-level-up-your-coding-skills-and-quickly-land-a-job-logo-shadow-tal-revivo.png" alt="LC" width="36" height="36">
+            <div>
+                <h1>LeetCode Dashboard</h1>
+                <a id="lc-profile-link" href="https://leetcode.com/u/harshith1459/" target="_blank" class="profile-link">@harshith1459 <i class="fas fa-external-link-alt"></i></a>
+            </div>
+        </div>
+
+        <!-- LC Stats Row -->
+        <section class="hero-stats four-col">
+            <div class="stat-card streak-card">
+                <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-streak-tab">—</span>
+                    <span class="stat-label">Day Streak</span>
+                </div>
+            </div>
+            <div class="stat-card rank-card">
+                <div class="stat-icon"><i class="fas fa-medal"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-ranking-tab">—</span>
+                    <span class="stat-label">Ranking</span>
+                </div>
+            </div>
+            <div class="stat-card active-card">
+                <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-active-tab">—</span>
+                    <span class="stat-label">Active Days</span>
+                </div>
+            </div>
+            <div class="stat-card total-card">
+                <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lc-accept-tab">—</span>
+                    <span class="stat-label">Accept Rate</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- LC Problem Breakdown full-width -->
+        <section class="full-card">
+            <div class="section-header"><h2><i class="fas fa-chart-pie"></i> Problem Breakdown</h2></div>
+            <div class="problems-breakdown">
+                <div class="problem-ring">
+                    <canvas id="lc-ring-tab" width="200" height="200"></canvas>
+                    <div class="ring-center">
+                        <span class="ring-value" id="lc-total-tab">—</span>
+                        <span class="ring-label">Solved</span>
+                    </div>
+                </div>
+                <div class="problem-details">
+                    <div class="detail-row easy">
+                        <span class="dot"></span>
+                        <span class="detail-label">Easy</span>
+                        <span class="detail-value" id="lc-easy-tab">—</span>
+                    </div>
+                    <div class="detail-row medium">
+                        <span class="dot"></span>
+                        <span class="detail-label">Medium</span>
+                        <span class="detail-value" id="lc-medium-tab">—</span>
+                    </div>
+                    <div class="detail-row hard">
+                        <span class="dot"></span>
+                        <span class="detail-label">Hard</span>
+                        <span class="detail-value" id="lc-hard-tab">—</span>
+                    </div>
+                    <hr class="detail-divider">
+                    <div class="detail-row acceptance">
+                        <span class="dot"></span>
+                        <span class="detail-label">Contribution</span>
+                        <span class="detail-value" id="lc-contrib-tab">—</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LC Heatmap -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-th"></i> LeetCode Submission Heatmap</h2>
+            </div>
+            <div class="heatmap-container" id="lc-heatmap-container">
+                <p class="empty-msg">Loading heatmap...</p>
+            </div>
+        </section>
+
+        <!-- LC Topics -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-tags"></i> Topics Solved</h2>
+            </div>
+            <div class="topics-grid" id="topics-grid">
+                <p class="empty-msg">Loading topic data...</p>
+            </div>
+        </section>
+
+        <!-- LC Recent Submissions -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-clock"></i> Recent Submissions</h2>
+            </div>
+            <div class="recent-list" id="recent-list">
+                <p class="empty-msg">Loading...</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================== GFG TAB ===================== -->
+    <main class="main-content tab-content" id="tab-gfg">
+        <div class="tab-title-bar">
+            <img src="https://img.icons8.com/color/48/GeeksforGeeks.png" alt="GFG" width="36" height="36">
+            <div>
+                <h1>GeeksforGeeks Dashboard</h1>
+                <a id="gfg-profile-link" href="https://www.geeksforgeeks.org/profile/23211a6792" target="_blank" class="profile-link">@23211a6792 <i class="fas fa-external-link-alt"></i></a>
+            </div>
+        </div>
+
+        <!-- GFG Stats Row -->
+        <section class="hero-stats four-col">
+            <div class="stat-card coding-card">
+                <div class="stat-icon"><i class="fas fa-star"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="gfg-score-tab">—</span>
+                    <span class="stat-label">Coding Score</span>
+                </div>
+            </div>
+            <div class="stat-card total-card">
+                <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="gfg-solved-tab">—</span>
+                    <span class="stat-label">Problems Solved</span>
+                </div>
+            </div>
+            <div class="stat-card streak-card">
+                <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="gfg-streak-tab">—</span>
+                    <span class="stat-label">Current Streak</span>
+                </div>
+            </div>
+            <div class="stat-card rank-card">
+                <div class="stat-icon"><i class="fas fa-university"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="gfg-rank-tab">—</span>
+                    <span class="stat-label">Institute Rank</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- GFG Full Problem Card -->
+        <section class="full-card">
+            <div class="section-header"><h2><i class="fas fa-chart-pie"></i> Problem Summary</h2></div>
+            <div class="problems-breakdown">
+                <div class="problem-ring">
+                    <canvas id="gfg-ring-tab" width="200" height="200"></canvas>
+                    <div class="ring-center">
+                        <span class="ring-value" id="gfg-total-tab">—</span>
+                        <span class="ring-label">Solved</span>
+                    </div>
+                </div>
+                <div class="problem-details">
+                    <div class="detail-row easy">
+                        <span class="dot"></span>
+                        <span class="detail-label">Total Solved</span>
+                        <span class="detail-value" id="gfg-solved-detail">—</span>
+                    </div>
+                    <div class="detail-row medium">
+                        <span class="dot"></span>
+                        <span class="detail-label">Coding Score</span>
+                        <span class="detail-value" id="gfg-cs-detail">—</span>
+                    </div>
+                    <div class="detail-row acceptance">
+                        <span class="dot"></span>
+                        <span class="detail-label">Monthly Score</span>
+                        <span class="detail-value" id="gfg-monthly-detail">—</span>
+                    </div>
+                    <hr class="detail-divider">
+                    <div class="detail-row hard">
+                        <span class="dot"></span>
+                        <span class="detail-label">Max Streak</span>
+                        <span class="detail-value" id="gfg-maxstreak-detail">—</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GFG Activity Heatmap (tracked locally) -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-th"></i> GFG Activity Heatmap</h2>
+                <span class="heatmap-note">Tracked from daily snapshots</span>
+            </div>
+            <div class="heatmap-container" id="gfg-heatmap-container">
+                <p class="empty-msg">Activity data builds as you use CodeTrack daily.</p>
+            </div>
+        </section>
+
+        <!-- GFG Extra Info -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-info-circle"></i> Additional Info</h2>
+            </div>
+            <div class="gfg-info-grid">
+                <div class="info-item">
+                    <i class="fas fa-university"></i>
+                    <div>
+                        <strong>Institute</strong>
+                        <p id="gfg-institute-name">—</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-trophy"></i>
+                    <div>
+                        <strong>Institute Rank</strong>
+                        <p id="gfg-irank-info">—</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-fire-alt"></i>
+                    <div>
+                        <strong>Longest Streak</strong>
+                        <p id="gfg-longest-streak-info">—</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================== PRODUCTIVITY TAB ===================== -->
+    <main class="main-content tab-content" id="tab-productivity">
+        <div class="tab-title-bar">
+            <i class="fas fa-rocket" style="font-size:28px;color:var(--accent)"></i>
+            <div>
+                <h1>Productivity Hub</h1>
+                <p class="profile-link">Tips, plans, and focus tools for Harshith</p>
+            </div>
+        </div>
+
+        <!-- Focus Timer -->
+        <section class="full-card focus-timer-section">
+            <div class="section-header">
+                <h2><i class="fas fa-stopwatch"></i> Pomodoro Focus Timer</h2>
+            </div>
+            <div class="timer-container">
+                <div class="timer-display" id="timer-display">25:00</div>
+                <div class="timer-buttons">
+                    <button class="btn-primary" id="timer-start"><i class="fas fa-play"></i> Start</button>
+                    <button class="btn-outline" id="timer-reset"><i class="fas fa-redo"></i> Reset</button>
+                </div>
+                <p class="timer-info">25 min focus → 5 min break. Complete 4 sessions for a long break!</p>
+                <div class="sessions-row">
+                    <span class="session-dot" id="s1"></span>
+                    <span class="session-dot" id="s2"></span>
+                    <span class="session-dot" id="s3"></span>
+                    <span class="session-dot" id="s4"></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Daily Motivation Quote -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-quote-left"></i> Daily Motivation</h2>
+                <button class="btn-outline" id="new-quote-btn"><i class="fas fa-random"></i> New Quote</button>
+            </div>
+            <blockquote class="motivation-quote" id="motivation-quote">
+                "The only way to do great work is to love what you do." — Steve Jobs
+            </blockquote>
+        </section>
+
+        <!-- Study Plan -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-calendar-alt"></i> Suggested Study Plan</h2>
+            </div>
+            <div class="study-plan" id="study-plan">
+                <div class="plan-day"><span class="plan-label">Mon</span><span class="plan-topic">Arrays & Hashing</span><span class="plan-platform">LC + GFG</span></div>
+                <div class="plan-day"><span class="plan-label">Tue</span><span class="plan-topic">Linked Lists</span><span class="plan-platform">LC + GFG</span></div>
+                <div class="plan-day"><span class="plan-label">Wed</span><span class="plan-topic">Trees & BST</span><span class="plan-platform">LC + GFG</span></div>
+                <div class="plan-day"><span class="plan-label">Thu</span><span class="plan-topic">Dynamic Programming</span><span class="plan-platform">LC + GFG</span></div>
+                <div class="plan-day"><span class="plan-label">Fri</span><span class="plan-topic">Graphs & BFS/DFS</span><span class="plan-platform">LC + GFG</span></div>
+                <div class="plan-day"><span class="plan-label">Sat</span><span class="plan-topic">Stacks & Queues</span><span class="plan-platform">LC + GFG</span></div>
+                <div class="plan-day"><span class="plan-label">Sun</span><span class="plan-topic">Contest / Revision</span><span class="plan-platform">LC Weekly</span></div>
+            </div>
+        </section>
+
+        <!-- Productivity Tips -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-lightbulb"></i> Productivity Tips</h2>
+            </div>
+            <div class="tips-grid">
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-brain"></i></div>
+                    <h3>Solve Easy → Medium → Hard</h3>
+                    <p>Start each day with 1 easy to warm up, then move to medium difficulty. Attempt hard problems on weekends.</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-clock"></i></div>
+                    <h3>Time-Box Problems</h3>
+                    <p>Give yourself max 30 min per problem. If stuck, read the editorial and revisit later. No shame in learning!</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-book"></i></div>
+                    <h3>Review Past Solutions</h3>
+                    <p>Every Sunday, review 5 problems you solved earlier. Spaced repetition is key to retention.</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-users"></i></div>
+                    <h3>GFG POTD + LC Daily</h3>
+                    <p>Always solve the Problem of the Day on both platforms. This alone gives you 2 free problems daily!</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-dumbbell"></i></div>
+                    <h3>Consistency Over Intensity</h3>
+                    <p>3 problems daily × 365 days = 1095 problems a year. Small steps, massive results.</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-sticky-note"></i></div>
+                    <h3>Maintain a Notes Sheet</h3>
+                    <p>Write down the pattern for each problem (sliding window, two pointers, etc). Build your own pattern library.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Weekly Challenge -->
+        <section class="full-card">
+            <div class="section-header">
+                <h2><i class="fas fa-flag-checkered"></i> This Week's Challenge</h2>
+            </div>
+            <div class="weekly-challenge" id="weekly-challenge">
+                <div class="challenge-text">
+                    <h3>🔥 Solve 21 problems this week</h3>
+                    <p>3 per day × 7 days. Focus on topics you haven't practiced recently.</p>
+                </div>
+                <div class="challenge-progress">
+                    <div class="goal-progress-bar">
+                        <div class="goal-fill weekly-fill" id="weekly-fill"></div>
+                    </div>
+                    <span class="goal-count" id="weekly-count">0 / 21</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Built for <strong>Pooru Harshith</strong> with <i class="fas fa-heart" style="color:#e74c3c"></i> — CodeTrack &copy; 2026</p>
+    </footer>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay hidden" id="settings-modal">
+    <div class="modal-card">
+        <h2><i class="fas fa-cog"></i> Settings</h2>
+        <div class="input-group">
+            <label><i class="fas fa-terminal"></i> LeetCode Username</label>
+            <input type="text" id="settings-lc" value="harshith1459">
+        </div>
+        <div class="input-group">
+            <label><i class="fas fa-laptop-code"></i> GFG Username</label>
+            <input type="text" id="settings-gfg" value="23211a6792">
+        </div>
+        <div class="modal-actions">
+            <button class="btn-outline" id="modal-cancel">Cancel</button>
+            <button class="btn-primary" id="modal-save"><i class="fas fa-save"></i> Save & Reload</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
