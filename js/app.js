@@ -764,7 +764,6 @@ function renderHistory() {
                 return `<span class="delta-zero">0</span>`;
             };
 
-            const isToday = h.date === todayStr;
             const rowClass = isToday ? 'today-row' : '';
 
             return `<tr class="${rowClass}">
