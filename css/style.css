@@ -501,6 +501,25 @@ body {
 
 .btn-retry:hover { background: var(--accent-hover); }
 
+/* ===== CACHE BADGE ===== */
+.cache-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(243, 156, 18, 0.15);
+    color: var(--orange);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.cache-badge i { font-size: 10px; }
+
 /* ===== TOPIC TAGS ===== */
 .topics-grid {
     display: flex;
@@ -676,8 +695,90 @@ body {
 
 .history-table tr:hover td { background: rgba(108,99,255,0.04); }
 
-.delta-positive { color: var(--green); font-weight: 600; }
+.delta-positive { color: var(--green); font-weight: 700; }
+.delta-negative { color: var(--red); font-weight: 600; }
 .delta-zero { color: var(--text-muted); }
+
+/* ===== PROGRESS SUMMARY STATS ===== */
+.progress-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--bg-input);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.progress-stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 4px;
+}
+
+.progress-stat i {
+    font-size: 18px;
+    color: var(--accent);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(108, 99, 255, 0.12);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.progress-stat div { display: flex; flex-direction: column; }
+.progress-stat-value { font-size: 20px; font-weight: 800; line-height: 1.1; color: var(--text-primary); }
+.progress-stat-label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+
+/* ===== ENHANCED HISTORY TABLE ===== */
+.today-row td { background: rgba(108, 99, 255, 0.06) !important; }
+.today-row td:first-child { border-left: 3px solid var(--accent); }
+
+.today-dot {
+    font-size: 6px;
+    color: var(--accent);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.date-cell { white-space: nowrap; font-weight: 500; color: var(--text-primary) !important; }
+
+.platform-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.lc-badge { background: rgba(253, 203, 110, 0.12); color: var(--yellow); }
+.gfg-badge { background: rgba(0, 184, 148, 0.12); color: var(--green); }
+
+.day-total-cell { text-align: center; }
+
+.day-total-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 800;
+    background: linear-gradient(135deg, rgba(108, 99, 255, 0.15), rgba(116, 185, 255, 0.15));
+    color: var(--accent);
+    letter-spacing: 0.3px;
+}
+
+@media (max-width: 768px) {
+    .progress-summary { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+    .progress-summary { grid-template-columns: 1fr; }
+}
 
 /* ===== PRODUCTIVITY: TIMER ===== */
 .timer-container {

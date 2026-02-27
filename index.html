@@ -156,13 +156,16 @@
                         </div>
                     </div>
                 </div>
+                <div class="cache-badge hidden" id="lc-cache-badge">
+                    <i class="fas fa-database"></i> Cached data (API rate-limited)
+                </div>
                 <div class="loading-overlay" id="lc-loading">
                     <div class="spinner"></div>
                     <p>Fetching LeetCode data...</p>
                 </div>
                 <div class="error-overlay hidden" id="lc-error">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>Could not fetch LeetCode data.</p>
+                    <p id="lc-error-msg">Could not fetch LeetCode data.</p>
                     <button class="btn-retry" onclick="fetchLeetCode()">Retry</button>
                 </div>
             </section>
@@ -223,6 +226,7 @@
                 <h2><i class="fas fa-history"></i> Progress Log</h2>
                 <button class="btn-outline" id="clear-history-btn"><i class="fas fa-trash-alt"></i> Clear</button>
             </div>
+            <div class="progress-summary hidden" id="progress-summary"></div>
             <div class="history-chart-container">
                 <canvas id="history-chart" height="260"></canvas>
             </div>
@@ -231,10 +235,12 @@
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>LC Solved</th>
-                            <th>GFG Solved</th>
+                            <th>LeetCode</th>
+                            <th>+LC</th>
+                            <th>GFG</th>
+                            <th>+GFG</th>
                             <th>Total</th>
-                            <th>Δ Change</th>
+                            <th>Day</th>
                         </tr>
                     </thead>
                     <tbody id="history-body"></tbody>

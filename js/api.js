@@ -4,12 +4,18 @@
    Fixed GFG with multiple fallbacks
    ======================================== */
 
+// ─── LC API mirrors — tried in order ───
+const LC_API_BASES = [
+    'https://alfa-leetcode-api.onrender.com',
+    'https://leetcode-api-faisalshohag.vercel.app',
+];
+
 const API = {
     leetcode: {
-        profile: (u) => `https://alfa-leetcode-api.onrender.com/userProfile/${u}`,
-        solved:  (u) => `https://alfa-leetcode-api.onrender.com/${u}/solved`,
-        skills:  (u) => `https://alfa-leetcode-api.onrender.com/skillStats/${u}`,
-        calendar:(u) => `https://alfa-leetcode-api.onrender.com/${u}/calendar`,
+        profile: (base, u) => `${base}/userProfile/${u}`,
+        solved:  (base, u) => `${base}/${u}/solved`,
+        skills:  (base, u) => `${base}/skillStats/${u}`,
+        calendar:(base, u) => `${base}/${u}/calendar`,
         profileUrl: (u) => `https://leetcode.com/u/${u}/`,
     },
     gfg: {
@@ -25,19 +31,93 @@ const CORS_PROXIES = [
     { name: 'corsproxy', url: (target) => `https://corsproxy.io/?${encodeURIComponent(target)}`, type: 'direct' },
 ];
 
+// ─── Safe JSON fetch with timeout + status check ───
+async function safeFetchJSON(url, timeoutMs = 12000) {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}: ${text.substring(0, 120)}`);
+    }
+    return res.json();
+}
+
+// ─── LC cache in localStorage ───
+function cacheLCData(data) {
+    try { localStorage.setItem('ct_lc_cache', JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+}
+function getCachedLC() {
+    try {
+        const c = JSON.parse(localStorage.getItem('ct_lc_cache'));
+        if (c && c.data && (Date.now() - c.ts) < 3600000) return c.data; // valid for 1 hour
+    } catch(e) {}
+    return null;
+}
+
 /* ── LeetCode ─────────────────────────── */
 async function fetchLeetCodeAPI(username) {
-    const [profileRes, solvedRes, skillsRes, calendarRes] = await Promise.allSettled([
-        fetch(API.leetcode.profile(username)).then(r => r.json()),
-        fetch(API.leetcode.solved(username)).then(r => r.json()),
-        fetch(API.leetcode.skills(username)).then(r => r.json()),
-        fetch(API.leetcode.calendar(username)).then(r => r.json()),
-    ]);
+    let profile = {}, solved = {}, skills = {}, calendar = {};
+    let succeeded = false;
 
-    const profile  = profileRes.status  === 'fulfilled' ? profileRes.value  : {};
-    const solved   = solvedRes.status   === 'fulfilled' ? solvedRes.value   : {};
-    const skills   = skillsRes.status   === 'fulfilled' ? skillsRes.value   : {};
-    const calendar = calendarRes.status === 'fulfilled' ? calendarRes.value : {};
+    // ── Attempt 1: Primary API (alfa-leetcode-api) with split endpoints ──
+    const primaryBase = LC_API_BASES[0];
+    try {
+        console.log(`[LC] Trying primary API: ${primaryBase}`);
+        const [profileRes, solvedRes, skillsRes, calendarRes] = await Promise.allSettled([
+            safeFetchJSON(API.leetcode.profile(primaryBase, username)),
+            safeFetchJSON(API.leetcode.solved(primaryBase, username)),
+            safeFetchJSON(API.leetcode.skills(primaryBase, username)),
+            safeFetchJSON(API.leetcode.calendar(primaryBase, username)),
+        ]);
+
+        profile  = profileRes.status  === 'fulfilled' ? profileRes.value  : {};
+        solved   = solvedRes.status   === 'fulfilled' ? solvedRes.value   : {};
+        skills   = skillsRes.status   === 'fulfilled' ? skillsRes.value   : {};
+        calendar = calendarRes.status === 'fulfilled' ? calendarRes.value : {};
+
+        if (profile.totalSolved != null || solved.solvedProblem != null) {
+            console.log(`[LC] ✅ Primary API returned data`);
+            succeeded = true;
+        } else {
+            console.log(`[LC] ⚠️ Primary API returned empty data`);
+        }
+    } catch(e) {
+        console.log(`[LC] ❌ Primary API failed: ${e.message}`);
+    }
+
+    // ── Attempt 2: Fallback single-endpoint API ──
+    if (!succeeded) {
+        const fallbackBase = LC_API_BASES[1];
+        try {
+            console.log(`[LC] Trying fallback API: ${fallbackBase}`);
+            const data = await safeFetchJSON(`${fallbackBase}/${username}`, 15000);
+            if (data && data.totalSolved != null) {
+                console.log(`[LC] ✅ Fallback API returned data`);
+                // Map single-endpoint response to our expected shape
+                profile = data;
+                solved  = data;
+                skills  = {};
+                calendar = {
+                    submissionCalendar: data.submissionCalendar || {},
+                    streak: data.streak || 0,
+                    totalActiveDays: data.totalActiveDays || 0,
+                };
+                succeeded = true;
+            }
+        } catch(e) {
+            console.log(`[LC] ❌ Fallback API failed: ${e.message}`);
+        }
+    }
+
+    // ── Attempt 3: Use cached data ──
+    if (!succeeded) {
+        const cached = getCachedLC();
+        if (cached) {
+            console.log('[LC] 📦 Using cached data (API rate-limited or down)');
+            cached._fromCache = true;
+            return cached;
+        }
+        throw new Error('All LeetCode API mirrors failed and no cache available');
+    }
 
     // Submission calendar
     let submissionCalendar = {};
@@ -62,26 +142,30 @@ async function fetchLeetCodeAPI(username) {
     } catch(e) {}
     topicTags.sort((a, b) => b.count - a.count);
 
-    return {
-        totalSolved:   profile.totalSolved   ?? solved.solvedProblem ?? 0,
-        easySolved:    profile.easySolved     ?? solved.easySolved   ?? 0,
-        mediumSolved:  profile.mediumSolved   ?? solved.mediumSolved ?? 0,
-        hardSolved:    profile.hardSolved     ?? solved.hardSolved   ?? 0,
-        totalQuestions: profile.totalQuestions ?? 0,
-        easyTotal:     profile.totalEasy      ?? 0,
-        mediumTotal:   profile.totalMedium    ?? 0,
-        hardTotal:     profile.totalHard      ?? 0,
+    const result = {
+        totalSolved:   parseInt(profile.totalSolved ?? solved.solvedProblem ?? 0) || 0,
+        easySolved:    parseInt(profile.easySolved ?? solved.easySolved ?? 0) || 0,
+        mediumSolved:  parseInt(profile.mediumSolved ?? solved.mediumSolved ?? 0) || 0,
+        hardSolved:    parseInt(profile.hardSolved ?? solved.hardSolved ?? 0) || 0,
+        totalQuestions: parseInt(profile.totalQuestions ?? 0) || 0,
+        easyTotal:     parseInt(profile.totalEasy ?? 0) || 0,
+        mediumTotal:   parseInt(profile.totalMedium ?? 0) || 0,
+        hardTotal:     parseInt(profile.totalHard ?? 0) || 0,
         acceptanceRate: profile.acceptanceRate != null
             ? parseFloat(profile.acceptanceRate).toFixed(1) + '%' : '—',
         ranking: profile.ranking ?? '—',
-        contributionPoints: profile.contributionPoint ?? profile.contributionPoints ?? 0,
-        reputation: profile.reputation ?? 0,
-        streak:          calendar.streak          ?? 0,
-        totalActiveDays: calendar.totalActiveDays ?? 0,
+        contributionPoints: parseInt(profile.contributionPoint ?? profile.contributionPoints ?? 0) || 0,
+        reputation: parseInt(profile.reputation ?? 0) || 0,
+        streak:          parseInt(calendar.streak ?? 0) || 0,
+        totalActiveDays: parseInt(calendar.totalActiveDays ?? 0) || 0,
         submissionCalendar,
         topicTags,
         recentSubmissions: profile.recentSubmissions ?? [],
+        _fromCache: false,
     };
+
+    cacheLCData(result);
+    return result;
 }
 
 /* ── GFG ──────────────────────────────── */
@@ -166,15 +250,15 @@ async function fetchGFGAPI(username) {
 function parseGFGAuthData(d) {
     console.log('[GFG] Parsing auth data:', JSON.stringify(d).substring(0, 300));
     return {
-        totalProblemsSolved: d.total_problems_solved ?? 0,
+        totalProblemsSolved: parseInt(d.total_problems_solved ?? 0) || 0,
         school:  0,
         basic:   0,
         easy:    0,
         medium:  0,
         hard:    0,
         codingScore:   d.score ?? '—',
-        monthlyScore:  d.monthly_score ?? 0,
-        currentStreak: d.pod_solved_current_streak ?? 0,
+        monthlyScore:  parseInt(d.monthly_score ?? 0) || 0,
+        currentStreak: parseInt(d.pod_solved_current_streak ?? 0) || 0,
         maxStreak:     d.pod_solved_longest_streak ?? '—',
         instituteRank: d.institute_rank ?? '—',
         instituteName: d.institute_name ?? '',

@@ -166,8 +166,10 @@ async function refreshAll() {
 async function fetchLeetCode() {
     const loading = $('#lc-loading');
     const error   = $('#lc-error');
+    const cacheBadge = $('#lc-cache-badge');
     loading.classList.remove('hidden');
     error.classList.add('hidden');
+    if (cacheBadge) cacheBadge.classList.add('hidden');
 
     try {
         lcData = await fetchLeetCodeAPI(lcUsername);
@@ -176,9 +178,22 @@ async function fetchLeetCode() {
         renderLCHeatmap();
         renderRecent();
         loading.classList.add('hidden');
+        // Show cache indicator if data came from cache
+        if (lcData._fromCache && cacheBadge) {
+            cacheBadge.classList.remove('hidden');
+        }
     } catch (e) {
         loading.classList.add('hidden');
         error.classList.remove('hidden');
+        // Update error message with specifics
+        const errMsg = $('#lc-error-msg');
+        if (errMsg) {
+            if (e.message.includes('429') || e.message.includes('rate')) {
+                errMsg.textContent = 'API rate-limited (429). Try again in ~1 hour.';
+            } else {
+                errMsg.textContent = 'Could not fetch LeetCode data. API may be down.';
+            }
+        }
         console.error('LC fetch error:', e);
     }
 }
@@ -425,7 +440,7 @@ function renderRecent() {
 
 // ─── Update Totals ────────────────────
 function updateTotals() {
-    const lcSolved  = lcData ? lcData.totalSolved : 0;
+    const lcSolved  = lcData ? (parseInt(lcData.totalSolved) || 0) : 0;
     const gfgSolved = gfgData ? (parseInt(gfgData.totalProblemsSolved) || 0) : 0;
     $('#total-solved').textContent = lcSolved + gfgSolved;
 }
@@ -446,13 +461,32 @@ function seedYesterdayBaseline(lcNow, gfgNow, lcTodayFromCalendar) {
 
     const entry = { date: yStr, lc: lcYesterday, gfg: gfgYesterday, total: lcYesterday + gfgYesterday };
     history.unshift(entry); // add at beginning
+    // Also sort to be safe
+    history.sort((a, b) => a.date.localeCompare(b.date));
     localStorage.setItem('ct_history', JSON.stringify(history));
     console.log('[GOALS] Seeded yesterday baseline:', entry);
 }
 
+// ─── Get LC problems solved today from submission calendar ──
+function getLCTodayFromCalendar() {
+    if (!lcData || !lcData.submissionCalendar) return 0;
+    const cal = lcData.submissionCalendar;
+
+    // LeetCode uses UTC midnight timestamps as keys
+    const now = new Date();
+    const utcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000;
+
+    // Also check local midnight in case API uses that
+    const localMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+
+    const count = cal[utcMidnight] || cal[String(utcMidnight)] || cal[localMidnight] || cal[String(localMidnight)] || 0;
+    console.log(`[GOALS] LC calendar lookup: UTC=${utcMidnight}, local=${localMidnight}, found=${count}`);
+    return count;
+}
+
 // ─── Per-Platform Daily Goals ─────────
 function updateGoalDisplays() {
-    const lcNow  = lcData ? lcData.totalSolved : 0;
+    const lcNow  = lcData ? (parseInt(lcData.totalSolved) || 0) : 0;
     const gfgNow = gfgData ? (parseInt(gfgData.totalProblemsSolved) || 0) : 0;
     const today  = new Date().toISOString().split('T')[0];
     const history = getHistory();
@@ -460,27 +494,39 @@ function updateGoalDisplays() {
     let lcToday  = 0;
     let gfgToday = 0;
 
-    // Compare against previous day's history entry
+    // Method 1: Compare against previous day's history entry (most reliable)
     const prevDayEntry = history.filter(h => h.date < today).pop();
+
     if (prevDayEntry) {
-        lcToday  = Math.max(0, lcNow - prevDayEntry.lc);
-        gfgToday = Math.max(0, gfgNow - prevDayEntry.gfg);
-    } else {
-        // No previous day at all — first time using CodeTrack.
-        // Use LC submission calendar to count today's submissions
-        if (lcData && lcData.submissionCalendar) {
-            const todayMidnight = Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime() / 1000);
-            lcToday = lcData.submissionCalendar[todayMidnight] || 0;
-        }
-        // For GFG — no calendar available, so seed a "yesterday" baseline
-        // so future refreshes can detect changes
-        if (history.length <= 1) {
-            seedYesterdayBaseline(lcNow, gfgNow, lcToday);
+        const prevLc  = parseInt(prevDayEntry.lc) || 0;
+        const prevGfg = parseInt(prevDayEntry.gfg) || 0;
+        lcToday  = Math.max(0, lcNow - prevLc);
+        gfgToday = Math.max(0, gfgNow - prevGfg);
+        console.log(`[GOALS] Using history baseline: prev(${prevDayEntry.date}) LC=${prevLc}, GFG=${prevGfg}`);
+    }
+
+    // Method 2: Cross-check with LC submission calendar (more accurate for LC)
+    const calendarToday = getLCTodayFromCalendar();
+    if (calendarToday > 0) {
+        // Calendar is authoritative for LC — it tracks actual accepted submissions
+        // Use the higher of the two methods (calendar vs history diff)
+        if (calendarToday > lcToday) {
+            console.log(`[GOALS] LC calendar (${calendarToday}) > history diff (${lcToday}), using calendar`);
+            lcToday = calendarToday;
         }
     }
 
-    console.log(`[GOALS] LC: ${lcNow} now, prev: ${prevDayEntry?.lc ?? 'none'}, today solved: ${lcToday}`);
-    console.log(`[GOALS] GFG: ${gfgNow} now, prev: ${prevDayEntry?.gfg ?? 'none'}, today solved: ${gfgToday}`);
+    // Method 3: No previous day at all — first time using CodeTrack
+    if (!prevDayEntry) {
+        lcToday = calendarToday; // calendar is our best bet
+        console.log(`[GOALS] No prev day — seeding baseline`);
+        // Seed a yesterday entry so tomorrow's goal tracking works
+        seedYesterdayBaseline(lcNow, gfgNow, lcToday);
+    }
+
+    console.log(`[GOALS] FINAL → LC today: ${lcToday}, GFG today: ${gfgToday}`);
+    console.log(`[GOALS] LC: ${lcNow} now, prev: ${prevDayEntry?.lc ?? 'none'}`);
+    console.log(`[GOALS] GFG: ${gfgNow} now, prev: ${prevDayEntry?.gfg ?? 'none'}`);
 
     const goal = DAILY_GOAL_PER_PLATFORM;
 
@@ -582,7 +628,7 @@ function getHistory() {
 function saveSnapshot() {
     const history = getHistory();
     const today = new Date().toISOString().split('T')[0];
-    const lcSolved  = lcData ? lcData.totalSolved : 0;
+    const lcSolved  = lcData ? (parseInt(lcData.totalSolved) || 0) : 0;
     const gfgSolved = gfgData ? (parseInt(gfgData.totalProblemsSolved) || 0) : 0;
     const total = lcSolved + gfgSolved;
 
@@ -598,22 +644,118 @@ function saveSnapshot() {
 function renderHistory() {
     const history = getHistory();
     const tbody   = $('#history-body');
+    const summaryEl = $('#progress-summary');
 
+    // --- Compute summary stats ---
+    let weekSolved = 0, bestDay = 0, totalDays = history.length, avgPerDay = 0;
+    let trackingStreak = 0;
+    const dailyDeltas = [];
+
+    for (let i = 0; i < history.length; i++) {
+        const prev = i > 0 ? history[i - 1] : null;
+        const lcDelta  = prev ? Math.max(0, (parseInt(history[i].lc) || 0) - (parseInt(prev.lc) || 0)) : 0;
+        const gfgDelta = prev ? Math.max(0, (parseInt(history[i].gfg) || 0) - (parseInt(prev.gfg) || 0)) : 0;
+        const dayTotal = lcDelta + gfgDelta;
+        dailyDeltas.push({ date: history[i].date, lcDelta, gfgDelta, dayTotal });
+        if (dayTotal > bestDay) bestDay = dayTotal;
+    }
+
+    // Week calculation (Mon-Sun)
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - mondayOffset);
+    const mondayStr = monday.toISOString().split('T')[0];
+    weekSolved = dailyDeltas.filter(d => d.date >= mondayStr).reduce((s, d) => s + d.dayTotal, 0);
+
+    // Average (last 7 entries with deltas)
+    const recent7 = dailyDeltas.slice(-7);
+    const sumRecent = recent7.reduce((s, d) => s + d.dayTotal, 0);
+    avgPerDay = recent7.length > 0 ? (sumRecent / recent7.length).toFixed(1) : '0';
+
+    // Tracking streak: consecutive days with entries from today backwards
+    const todayStr = today.toISOString().split('T')[0];
+    for (let i = history.length - 1; i >= 0; i--) {
+        const expected = new Date(today);
+        expected.setDate(today.getDate() - (history.length - 1 - i));
+        if (history[i].date === expected.toISOString().split('T')[0]) {
+            trackingStreak++;
+        } else break;
+    }
+
+    // --- Render summary stats ---
+    if (summaryEl) {
+        if (history.length >= 2) {
+            summaryEl.innerHTML = `
+                <div class="progress-stat">
+                    <i class="fas fa-calendar-week"></i>
+                    <div>
+                        <span class="progress-stat-value">${weekSolved}</span>
+                        <span class="progress-stat-label">This Week</span>
+                    </div>
+                </div>
+                <div class="progress-stat">
+                    <i class="fas fa-chart-bar"></i>
+                    <div>
+                        <span class="progress-stat-value">${avgPerDay}</span>
+                        <span class="progress-stat-label">Avg / Day</span>
+                    </div>
+                </div>
+                <div class="progress-stat">
+                    <i class="fas fa-bolt"></i>
+                    <div>
+                        <span class="progress-stat-value">+${bestDay}</span>
+                        <span class="progress-stat-label">Best Day</span>
+                    </div>
+                </div>
+                <div class="progress-stat">
+                    <i class="fas fa-link"></i>
+                    <div>
+                        <span class="progress-stat-value">${trackingStreak}d</span>
+                        <span class="progress-stat-label">Tracking Streak</span>
+                    </div>
+                </div>
+            `;
+            summaryEl.classList.remove('hidden');
+        } else {
+            summaryEl.classList.add('hidden');
+        }
+    }
+
+    // --- Render table ---
     if (history.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">
             No history yet. Data is recorded each time you refresh.</td></tr>`;
     } else {
         tbody.innerHTML = history.slice().reverse().map((h, i, arr) => {
             const prev  = arr[i + 1];
-            const delta = prev ? h.total - prev.total : 0;
-            const cls   = delta > 0 ? 'delta-positive' : 'delta-zero';
-            const sign  = delta > 0 ? '+' : '';
-            return `<tr>
-                <td>${formatDate(h.date)}</td>
-                <td>${h.lc}</td>
-                <td>${h.gfg}</td>
-                <td><strong>${h.total}</strong></td>
-                <td class="${cls}">${sign}${delta}</td>
+            const lcVal  = parseInt(h.lc) || 0;
+            const gfgVal = parseInt(h.gfg) || 0;
+            const totalVal = lcVal + gfgVal;
+            const prevLc  = prev ? (parseInt(prev.lc) || 0) : lcVal;
+            const prevGfg = prev ? (parseInt(prev.gfg) || 0) : gfgVal;
+            const lcDelta  = lcVal - prevLc;
+            const gfgDelta = gfgVal - prevGfg;
+            const dayTotal = Math.max(0, lcDelta) + Math.max(0, gfgDelta);
+
+            const fmtDelta = (d) => {
+                if (d > 0) return `<span class="delta-positive">+${d}</span>`;
+                if (d < 0) return `<span class="delta-negative">${d}</span>`;
+                return `<span class="delta-zero">0</span>`;
+            };
+
+            const isToday = h.date === todayStr;
+            const rowClass = isToday ? 'today-row' : '';
+
+            return `<tr class="${rowClass}">
+                <td class="date-cell">${isToday ? '<i class="fas fa-circle today-dot"></i>' : ''}${formatDate(h.date)}</td>
+                <td><span class="platform-badge lc-badge">${lcVal}</span></td>
+                <td>${fmtDelta(lcDelta)}</td>
+                <td><span class="platform-badge gfg-badge">${gfgVal}</span></td>
+                <td>${fmtDelta(gfgDelta)}</td>
+                <td><strong>${totalVal}</strong></td>
+                <td class="day-total-cell">${dayTotal > 0 ? `<span class="day-total-badge">+${dayTotal}</span>` : `<span class="delta-zero">—</span>`}</td>
             </tr>`;
         }).join('');
     }
