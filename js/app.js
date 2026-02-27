@@ -208,6 +208,7 @@ async function fetchGFG() {
     try {
         gfgData = await fetchGFGAPI(gfgUsername);
         console.log('[APP] GFG data received:', gfgData);
+        if (!gfgData._fromCache) cacheGFGData(gfgData);
         renderGFG();
         loading.classList.add('hidden');
     } catch (e) {

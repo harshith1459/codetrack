@@ -6,8 +6,8 @@
 
 // ─── LC API mirrors — tried in order ───
 const LC_API_BASES = [
-    'https://alfa-leetcode-api.onrender.com',
-    'https://leetcode-api-faisalshohag.vercel.app',
+    'https://leetcode-api-faisalshohag.vercel.app',   // fast & reliable
+    'https://alfa-leetcode-api.onrender.com',          // slow cold-start fallback
 ];
 
 const API = {
@@ -32,7 +32,7 @@ const CORS_PROXIES = [
 ];
 
 // ─── Safe JSON fetch with timeout + status check ───
-async function safeFetchJSON(url, timeoutMs = 12000) {
+async function safeFetchJSON(url, timeoutMs = 6000) {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) {
         const text = await res.text().catch(() => '');
@@ -106,50 +106,51 @@ async function fetchLeetCodeAPI(username) {
     let profile = {}, solved = {}, skills = {}, calendar = {};
     let succeeded = false;
 
-    // ── Attempt 1: Primary API (alfa-leetcode-api) with split endpoints ──
-    const primaryBase = LC_API_BASES[0];
+    // ── Attempt 1: Fast single-endpoint API (Vercel — reliable) ──
+    const fastBase = LC_API_BASES[0];
     try {
-        console.log(`[LC] Trying primary API: ${primaryBase}`);
-        const [profileRes, solvedRes, skillsRes, calendarRes] = await Promise.allSettled([
-            safeFetchJSON(API.leetcode.profile(primaryBase, username)),
-            safeFetchJSON(API.leetcode.solved(primaryBase, username)),
-            safeFetchJSON(API.leetcode.skills(primaryBase, username)),
-            safeFetchJSON(API.leetcode.calendar(primaryBase, username)),
-        ]);
-
-        profile  = profileRes.status  === 'fulfilled' ? profileRes.value  : {};
-        solved   = solvedRes.status   === 'fulfilled' ? solvedRes.value   : {};
-        skills   = skillsRes.status   === 'fulfilled' ? skillsRes.value   : {};
-        calendar = calendarRes.status === 'fulfilled' ? calendarRes.value : {};
-
-        if (profile.totalSolved != null || solved.solvedProblem != null) {
-            console.log(`[LC] ✅ Primary API returned data`);
+        console.log(`[LC] Trying fast API: ${fastBase}`);
+        const data = await safeFetchJSON(`${fastBase}/${username}`, 8000);
+        if (data && data.totalSolved != null) {
+            console.log(`[LC] ✅ Fast API returned data`);
+            profile = data;
+            solved  = data;
+            skills  = {};
+            calendar = {
+                submissionCalendar: data.submissionCalendar || {},
+                streak: data.streak || 0,
+                totalActiveDays: data.totalActiveDays || 0,
+            };
             succeeded = true;
         } else {
-            console.log(`[LC] ⚠️ Primary API returned empty data`);
+            console.log(`[LC] ⚠️ Fast API returned empty data`);
         }
     } catch(e) {
-        console.log(`[LC] ❌ Primary API failed: ${e.message}`);
+        console.log(`[LC] ❌ Fast API failed: ${e.message}`);
     }
 
-    // ── Attempt 2: Fallback single-endpoint API ──
+    // ── Attempt 2: Split-endpoint fallback (Render — slow cold-start) ──
     if (!succeeded) {
         const fallbackBase = LC_API_BASES[1];
         try {
             console.log(`[LC] Trying fallback API: ${fallbackBase}`);
-            const data = await safeFetchJSON(`${fallbackBase}/${username}`, 15000);
-            if (data && data.totalSolved != null) {
+            const [profileRes, solvedRes, skillsRes, calendarRes] = await Promise.allSettled([
+                safeFetchJSON(API.leetcode.profile(fallbackBase, username), 8000),
+                safeFetchJSON(API.leetcode.solved(fallbackBase, username), 8000),
+                safeFetchJSON(API.leetcode.skills(fallbackBase, username), 8000),
+                safeFetchJSON(API.leetcode.calendar(fallbackBase, username), 8000),
+            ]);
+
+            profile  = profileRes.status  === 'fulfilled' ? profileRes.value  : {};
+            solved   = solvedRes.status   === 'fulfilled' ? solvedRes.value   : {};
+            skills   = skillsRes.status   === 'fulfilled' ? skillsRes.value   : {};
+            calendar = calendarRes.status === 'fulfilled' ? calendarRes.value : {};
+
+            if (profile.totalSolved != null || solved.solvedProblem != null) {
                 console.log(`[LC] ✅ Fallback API returned data`);
-                // Map single-endpoint response to our expected shape
-                profile = data;
-                solved  = data;
-                skills  = {};
-                calendar = {
-                    submissionCalendar: data.submissionCalendar || {},
-                    streak: data.streak || 0,
-                    totalActiveDays: data.totalActiveDays || 0,
-                };
                 succeeded = true;
+            } else {
+                console.log(`[LC] ⚠️ Fallback API returned empty data`);
             }
         } catch(e) {
             console.log(`[LC] ❌ Fallback API failed: ${e.message}`);
@@ -219,6 +220,18 @@ async function fetchLeetCodeAPI(username) {
     return result;
 }
 
+// ─── GFG cache in localStorage ───
+function cacheGFGData(data) {
+    try { localStorage.setItem('ct_gfg_cache', JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+}
+function getCachedGFG() {
+    try {
+        const c = JSON.parse(localStorage.getItem('ct_gfg_cache'));
+        if (c && c.data && (Date.now() - c.ts) < 3600000) return c.data; // valid 1 hour
+    } catch(e) {}
+    return null;
+}
+
 /* ── GFG ──────────────────────────────── */
 async function fetchGFGAPI(username) {
     const apiUrl = API.gfg.authApi(username);
@@ -227,7 +240,7 @@ async function fetchGFGAPI(username) {
     // Attempt 1: Direct API call
     try {
         console.log('[GFG] Attempt 1: Direct API...');
-        const res = await fetch(apiUrl, { signal: AbortSignal.timeout(6000) });
+        const res = await fetch(apiUrl, { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
             const d = await res.json();
             console.log('[GFG] Direct API response:', d);
@@ -243,7 +256,7 @@ async function fetchGFGAPI(username) {
         try {
             console.log(`[GFG] Trying ${proxy.name} proxy...`);
             const proxyUrl = proxy.url(apiUrl);
-            const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+            const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
             
             if (res.ok) {
                 if (proxy.type === 'wrapped') {
@@ -284,7 +297,7 @@ async function fetchGFGAPI(username) {
         console.log('[GFG] Attempt: Scraping profile page...');
         const profileUrl = API.gfg.profileUrl(username);
         const proxyUrl = CORS_PROXIES[0].url(profileUrl);
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
         if (res.ok) {
             const html = await res.text();
             const parsed = parseGFGHTML(html);
@@ -295,7 +308,14 @@ async function fetchGFGAPI(username) {
         }
     } catch(e) { console.log('[GFG] Profile scrape failed:', e.message); }
 
-    throw new Error('Could not fetch GFG data after all attempts.');
+    // Attempt: Use cached data
+    const cachedGfg = getCachedGFG();
+    if (cachedGfg) {
+        console.log('[GFG] 📦 Using cached data');
+        cachedGfg._fromCache = true;
+        return cachedGfg;
+    }
+    throw new Error('Could not fetch GFG data after all attempts and no cache.');
 }
 
 function parseGFGAuthData(d) {
