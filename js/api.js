@@ -195,8 +195,15 @@ async function fetchLeetCodeAPI(username) {
         easyTotal:     parseInt(profile.totalEasy ?? 0) || 0,
         mediumTotal:   parseInt(profile.totalMedium ?? 0) || 0,
         hardTotal:     parseInt(profile.totalHard ?? 0) || 0,
-        acceptanceRate: profile.acceptanceRate != null
-            ? parseFloat(profile.acceptanceRate).toFixed(1) + '%' : '—',
+        acceptanceRate: (() => {
+            if (profile.acceptanceRate != null) return parseFloat(profile.acceptanceRate).toFixed(1) + '%';
+            // Compute from totalSubmissions if available (Vercel fallback)
+            const ts = profile.totalSubmissions;
+            if (Array.isArray(ts) && ts[0] && ts[0].submissions > 0) {
+                return ((ts[0].count / ts[0].submissions) * 100).toFixed(1) + '%';
+            }
+            return '—';
+        })(),
         ranking: profile.ranking ?? '—',
         contributionPoints: parseInt(profile.contributionPoint ?? profile.contributionPoints ?? 0) || 0,
         reputation: parseInt(profile.reputation ?? 0) || 0,
@@ -303,7 +310,7 @@ function parseGFGAuthData(d) {
         codingScore:   d.score ?? '—',
         monthlyScore:  parseInt(d.monthly_score ?? 0) || 0,
         currentStreak: parseInt(d.pod_solved_current_streak ?? 0) || 0,
-        maxStreak:     d.pod_solved_longest_streak ?? '—',
+        maxStreak:     parseInt(d.pod_solved_longest_streak ?? 0) || 0,
         instituteRank: d.institute_rank ?? '—',
         instituteName: d.institute_name ?? '',
         languages:     d.languages_used ? Object.keys(d.languages_used) : [],
@@ -324,7 +331,7 @@ function parseGFGHTML(html) {
         codingScore:   score  ? score[1]  : '—',
         monthlyScore:  0,
         currentStreak: streak ? parseInt(streak[1]) : 0,
-        maxStreak:     maxStr ? maxStr[1] : '—',
+        maxStreak:     maxStr ? parseInt(maxStr[1]) : 0,
         instituteRank: rank   ? rank[1]   : '—',
         instituteName: inst   ? inst[1]   : '',
         languages:     [],

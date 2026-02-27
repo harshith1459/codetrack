@@ -289,14 +289,14 @@ function renderGFG() {
     $('#gfg-total-tab').textContent       = total;
     $('#gfg-solved-detail').textContent   = total;
     $('#gfg-cs-detail').textContent       = gfgData.codingScore;
-    $('#gfg-monthly-detail').textContent  = gfgData.monthlyScore || '—';
-    $('#gfg-maxstreak-detail').textContent = gfgData.maxStreak || '—';
+    $('#gfg-monthly-detail').textContent  = gfgData.monthlyScore ?? '—';
+    $('#gfg-maxstreak-detail').textContent = gfgData.maxStreak ?? '—';
 
     // GFG Info
     $('#gfg-institute-name').textContent     = gfgData.instituteName || 'BVRIT Medak';
     $('#gfg-irank-info').textContent         = gfgData.instituteRank !== '—'
         ? '#' + gfgData.instituteRank : '—';
-    $('#gfg-longest-streak-info').textContent = gfgData.maxStreak || '—';
+    $('#gfg-longest-streak-info').textContent = gfgData.maxStreak ?? '—';
 
     // Donuts
     drawDonut('gfg-ring', [{ value: total, color: '#00b894' }], total || 1);
@@ -346,8 +346,8 @@ function renderLCHeatmap() {
     for (let i = days - 1; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
-        const ts = Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000);
-        const count = cal[ts] || 0;
+        const ts = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 1000);
+        const count = cal[ts] || cal[String(ts)] || 0;
         const level = count === 0 ? 0 : count <= 2 ? 1 : count <= 5 ? 2 : count <= 8 ? 3 : 4;
         const title = `${d.toLocaleDateString('en-US', {month:'short', day:'numeric'})}: ${count} submission${count !== 1 ? 's' : ''}`;
         html += `<div class="heatmap-cell lc-heatmap level-${level}" title="${title}"></div>`;
