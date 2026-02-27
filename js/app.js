@@ -767,51 +767,156 @@ function renderHistoryChart(history) {
     if (!canvas) return;
     if (historyChart) historyChart.destroy();
 
-    if (history.length < 2) {
+    if (history.length === 0) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#55557a';
         ctx.font = '14px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Chart will appear after 2+ days of data', canvas.width / 2, 130);
+        ctx.fillText('Solve problems & refresh to see your daily chart!', canvas.width / 2, 130);
         return;
     }
 
+    // Compute daily deltas for bar chart
+    const labels = [];
+    const lcDaily = [];
+    const gfgDaily = [];
+    const cumulativeTotal = [];
+
+    for (let i = 0; i < history.length; i++) {
+        labels.push(formatDate(history[i].date));
+        const lcVal  = parseInt(history[i].lc) || 0;
+        const gfgVal = parseInt(history[i].gfg) || 0;
+
+        if (i === 0) {
+            // First entry — use LC calendar if available, else 0
+            const calToday = getLCTodayFromCalendar && history[i].date === new Date().toISOString().split('T')[0]
+                ? getLCTodayFromCalendar() : 0;
+            lcDaily.push(calToday || 0);
+            gfgDaily.push(0);
+        } else {
+            const prevLc  = parseInt(history[i - 1].lc) || 0;
+            const prevGfg = parseInt(history[i - 1].gfg) || 0;
+            lcDaily.push(Math.max(0, lcVal - prevLc));
+            gfgDaily.push(Math.max(0, gfgVal - prevGfg));
+        }
+        cumulativeTotal.push(lcVal + gfgVal);
+    }
+
+    // If only 1 day and both deltas are 0, show today's cumulative as context
+    const hasAnyDelta = lcDaily.some(v => v > 0) || gfgDaily.some(v => v > 0);
+
     historyChart = new Chart(canvas, {
-        type: 'line',
+        type: 'bar',
         data: {
-            labels: history.map(h => formatDate(h.date)),
+            labels,
             datasets: [
                 {
-                    label: 'Total', data: history.map(h => h.total),
-                    borderColor: '#6c63ff', backgroundColor: 'rgba(108,99,255,0.1)',
-                    fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 4,
+                    label: 'LeetCode',
+                    data: lcDaily,
+                    backgroundColor: 'rgba(253, 203, 110, 0.75)',
+                    borderColor: '#fdcb6e',
+                    borderWidth: 1.5,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    stack: 'daily',
+                    order: 2,
                 },
                 {
-                    label: 'LeetCode', data: history.map(h => h.lc),
-                    borderColor: '#fdcb6e', backgroundColor: 'transparent',
-                    tension: 0.4, borderWidth: 2, pointRadius: 3, borderDash: [6, 3],
+                    label: 'GFG',
+                    data: gfgDaily,
+                    backgroundColor: 'rgba(0, 184, 148, 0.75)',
+                    borderColor: '#00b894',
+                    borderWidth: 1.5,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    stack: 'daily',
+                    order: 2,
                 },
                 {
-                    label: 'GFG', data: history.map(h => h.gfg),
-                    borderColor: '#00b894', backgroundColor: 'transparent',
-                    tension: 0.4, borderWidth: 2, pointRadius: 3, borderDash: [6, 3],
+                    label: 'Cumulative Total',
+                    data: cumulativeTotal,
+                    type: 'line',
+                    borderColor: '#6c63ff',
+                    backgroundColor: 'rgba(108, 99, 255, 0.08)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#6c63ff',
+                    yAxisID: 'y1',
+                    order: 1,
                 },
             ],
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true,
+            maintainAspectRatio: false,
             interaction: { intersect: false, mode: 'index' },
             plugins: {
-                legend: { labels: { color: '#8888a8', font: { family:'Inter', size:12 } } },
+                legend: {
+                    labels: {
+                        color: '#8888a8',
+                        font: { family: 'Inter', size: 12 },
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded',
+                        padding: 16,
+                    },
+                },
                 tooltip: {
-                    backgroundColor:'#1a1a2e', titleColor:'#e8e8f0', bodyColor:'#8888a8',
-                    borderColor:'#2a2a45', borderWidth:1, cornerRadius:8, padding:12,
+                    backgroundColor: '#1a1a2e',
+                    titleColor: '#e8e8f0',
+                    bodyColor: '#8888a8',
+                    borderColor: '#2a2a45',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    padding: 12,
+                    callbacks: {
+                        afterBody: function(items) {
+                            const idx = items[0]?.dataIndex;
+                            if (idx == null) return '';
+                            const dayTotal = (lcDaily[idx] || 0) + (gfgDaily[idx] || 0);
+                            return `\n📊 Day total: ${dayTotal} problem${dayTotal !== 1 ? 's' : ''}`;
+                        },
+                    },
                 },
             },
             scales: {
-                x: { ticks: { color:'#55557a', font:{ size:11 } }, grid:{ color:'rgba(42,42,69,0.3)' } },
-                y: { ticks: { color:'#55557a', font:{ size:11 } }, grid:{ color:'rgba(42,42,69,0.3)' } },
+                x: {
+                    ticks: { color: '#55557a', font: { size: 11 } },
+                    grid: { color: 'rgba(42,42,69,0.3)' },
+                },
+                y: {
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Daily Solved',
+                        color: '#55557a',
+                        font: { size: 11, family: 'Inter' },
+                    },
+                    ticks: {
+                        color: '#55557a',
+                        font: { size: 11 },
+                        stepSize: 1,
+                        beginAtZero: true,
+                    },
+                    grid: { color: 'rgba(42,42,69,0.3)' },
+                    stacked: true,
+                },
+                y1: {
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Cumulative',
+                        color: '#6c63ff',
+                        font: { size: 11, family: 'Inter' },
+                    },
+                    ticks: {
+                        color: '#6c63ff',
+                        font: { size: 11 },
+                    },
+                    grid: { drawOnChartArea: false },
+                },
             },
         },
     });
