@@ -53,6 +53,54 @@ function getCachedLC() {
     return null;
 }
 
+// ─── Parse submissionCalendar (handles JSON string, Python dict string, or object) ───
+function parseSubmissionCalendar(raw) {
+    if (!raw) return {};
+    if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+        try { return JSON.parse(raw); } catch(e) {}
+        try { return JSON.parse(raw.replace(/'/g, '"').replace(/None/g, 'null').replace(/True/g, 'true').replace(/False/g, 'false')); } catch(e2) {}
+    }
+    return {};
+}
+
+// ─── Compute streak from submissionCalendar ───
+function computeStreakFromCalendar(cal) {
+    if (!cal || Object.keys(cal).length === 0) return 0;
+
+    // Collect all active dates as "YYYY-MM-DD" strings (UTC)
+    const activeDates = new Set();
+    for (const [ts, count] of Object.entries(cal)) {
+        if (parseInt(count) > 0) {
+            const d = new Date(parseInt(ts) * 1000);
+            activeDates.add(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`);
+        }
+    }
+    if (activeDates.size === 0) return 0;
+
+    const now = new Date();
+    const fmt = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    let checkDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+    // If no submission today, start counting from yesterday
+    if (!activeDates.has(fmt(checkDate))) {
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+    }
+
+    let streak = 0;
+    while (activeDates.has(fmt(checkDate))) {
+        streak++;
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+    }
+    return streak;
+}
+
+// ─── Compute total active days from submissionCalendar ───
+function computeActiveDays(cal) {
+    if (!cal) return 0;
+    return Object.values(cal).filter(v => parseInt(v) > 0).length;
+}
+
 /* ── LeetCode ─────────────────────────── */
 async function fetchLeetCodeAPI(username) {
     let profile = {}, solved = {}, skills = {}, calendar = {};
@@ -119,14 +167,10 @@ async function fetchLeetCodeAPI(username) {
         throw new Error('All LeetCode API mirrors failed and no cache available');
     }
 
-    // Submission calendar
+    // Submission calendar — try multiple sources, handle Python dict strings
     let submissionCalendar = {};
-    try {
-        if (typeof calendar.submissionCalendar === 'string')
-            submissionCalendar = JSON.parse(calendar.submissionCalendar);
-        else if (profile.submissionCalendar && typeof profile.submissionCalendar === 'object')
-            submissionCalendar = profile.submissionCalendar;
-    } catch(e) {}
+    const rawCal = calendar.submissionCalendar || profile.submissionCalendar;
+    submissionCalendar = parseSubmissionCalendar(rawCal);
 
     // Topic tags
     const topicTags = [];
@@ -156,8 +200,8 @@ async function fetchLeetCodeAPI(username) {
         ranking: profile.ranking ?? '—',
         contributionPoints: parseInt(profile.contributionPoint ?? profile.contributionPoints ?? 0) || 0,
         reputation: parseInt(profile.reputation ?? 0) || 0,
-        streak:          parseInt(calendar.streak ?? 0) || 0,
-        totalActiveDays: parseInt(calendar.totalActiveDays ?? 0) || 0,
+        streak:          computeStreakFromCalendar(submissionCalendar),
+        totalActiveDays: computeActiveDays(submissionCalendar),
         submissionCalendar,
         topicTags,
         recentSubmissions: profile.recentSubmissions ?? [],
