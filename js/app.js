@@ -650,11 +650,19 @@ function renderHistory() {
     let weekSolved = 0, bestDay = 0, totalDays = history.length, avgPerDay = 0;
     let trackingStreak = 0;
     const dailyDeltas = [];
+    const calTodayForSummary = (typeof getLCTodayFromCalendar === 'function') ? getLCTodayFromCalendar() : 0;
 
     for (let i = 0; i < history.length; i++) {
         const prev = i > 0 ? history[i - 1] : null;
-        const lcDelta  = prev ? Math.max(0, (parseInt(history[i].lc) || 0) - (parseInt(prev.lc) || 0)) : 0;
+        let lcDelta  = prev ? Math.max(0, (parseInt(history[i].lc) || 0) - (parseInt(prev.lc) || 0)) : 0;
         const gfgDelta = prev ? Math.max(0, (parseInt(history[i].gfg) || 0) - (parseInt(prev.gfg) || 0)) : 0;
+
+        // For today: use LC calendar if it shows more (API totalSolved may lag)
+        const todayCheck = new Date().toISOString().split('T')[0];
+        if (history[i].date === todayCheck && calTodayForSummary > lcDelta) {
+            lcDelta = calTodayForSummary;
+        }
+
         const dayTotal = lcDelta + gfgDelta;
         dailyDeltas.push({ date: history[i].date, lcDelta, gfgDelta, dayTotal });
         if (dayTotal > bestDay) bestDay = dayTotal;
@@ -728,6 +736,8 @@ function renderHistory() {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">
             No history yet. Data is recorded each time you refresh.</td></tr>`;
     } else {
+        const calToday = (typeof getLCTodayFromCalendar === 'function') ? getLCTodayFromCalendar() : 0;
+
         tbody.innerHTML = history.slice().reverse().map((h, i, arr) => {
             const prev  = arr[i + 1];
             const lcVal  = parseInt(h.lc) || 0;
@@ -735,8 +745,16 @@ function renderHistory() {
             const totalVal = lcVal + gfgVal;
             const prevLc  = prev ? (parseInt(prev.lc) || 0) : lcVal;
             const prevGfg = prev ? (parseInt(prev.gfg) || 0) : gfgVal;
-            const lcDelta  = lcVal - prevLc;
+            let lcDelta  = lcVal - prevLc;
             const gfgDelta = gfgVal - prevGfg;
+
+            const isToday = h.date === todayStr;
+
+            // For today: cross-check with LC calendar (API totalSolved may lag behind)
+            if (isToday && calToday > Math.max(0, lcDelta)) {
+                lcDelta = calToday;
+            }
+
             const dayTotal = Math.max(0, lcDelta) + Math.max(0, gfgDelta);
 
             const fmtDelta = (d) => {
@@ -781,7 +799,8 @@ function renderHistoryChart(history) {
     const labels = [];
     const lcDaily = [];
     const gfgDaily = [];
-    const cumulativeTotal = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const calendarToday = (typeof getLCTodayFromCalendar === 'function') ? getLCTodayFromCalendar() : 0;
 
     for (let i = 0; i < history.length; i++) {
         labels.push(formatDate(history[i].date));
@@ -789,22 +808,28 @@ function renderHistoryChart(history) {
         const gfgVal = parseInt(history[i].gfg) || 0;
 
         if (i === 0) {
-            // First entry — use LC calendar if available, else 0
-            const calToday = getLCTodayFromCalendar && history[i].date === new Date().toISOString().split('T')[0]
-                ? getLCTodayFromCalendar() : 0;
-            lcDaily.push(calToday || 0);
+            // First entry — use calendar for today, else 0
+            const isToday = history[i].date === todayStr;
+            lcDaily.push(isToday ? calendarToday : 0);
             gfgDaily.push(0);
         } else {
             const prevLc  = parseInt(history[i - 1].lc) || 0;
             const prevGfg = parseInt(history[i - 1].gfg) || 0;
-            lcDaily.push(Math.max(0, lcVal - prevLc));
-            gfgDaily.push(Math.max(0, gfgVal - prevGfg));
+            let lcDelta = Math.max(0, lcVal - prevLc);
+            const gfgDelta = Math.max(0, gfgVal - prevGfg);
+
+            // For today: cross-check with LC calendar (more accurate, updates faster)
+            if (history[i].date === todayStr && calendarToday > lcDelta) {
+                lcDelta = calendarToday;
+            }
+
+            lcDaily.push(lcDelta);
+            gfgDaily.push(gfgDelta);
         }
-        cumulativeTotal.push(lcVal + gfgVal);
     }
 
-    // If only 1 day and both deltas are 0, show today's cumulative as context
-    const hasAnyDelta = lcDaily.some(v => v > 0) || gfgDaily.some(v => v > 0);
+    // Max daily value for nice Y axis
+    const maxDaily = Math.max(1, ...lcDaily.map((v, i) => v + (gfgDaily[i] || 0)));
 
     historyChart = new Chart(canvas, {
         type: 'bar',
@@ -814,38 +839,28 @@ function renderHistoryChart(history) {
                 {
                     label: 'LeetCode',
                     data: lcDaily,
-                    backgroundColor: 'rgba(253, 203, 110, 0.75)',
+                    backgroundColor: 'rgba(253, 203, 110, 0.85)',
                     borderColor: '#fdcb6e',
                     borderWidth: 1.5,
-                    borderRadius: 6,
+                    borderRadius: 8,
                     borderSkipped: false,
                     stack: 'daily',
-                    order: 2,
+                    maxBarThickness: 48,
+                    barPercentage: 0.6,
+                    categoryPercentage: 0.5,
                 },
                 {
                     label: 'GFG',
                     data: gfgDaily,
-                    backgroundColor: 'rgba(0, 184, 148, 0.75)',
+                    backgroundColor: 'rgba(0, 184, 148, 0.85)',
                     borderColor: '#00b894',
                     borderWidth: 1.5,
-                    borderRadius: 6,
+                    borderRadius: 8,
                     borderSkipped: false,
                     stack: 'daily',
-                    order: 2,
-                },
-                {
-                    label: 'Cumulative Total',
-                    data: cumulativeTotal,
-                    type: 'line',
-                    borderColor: '#6c63ff',
-                    backgroundColor: 'rgba(108, 99, 255, 0.08)',
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 2,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#6c63ff',
-                    yAxisID: 'y1',
-                    order: 1,
+                    maxBarThickness: 48,
+                    barPercentage: 0.6,
+                    categoryPercentage: 0.5,
                 },
             ],
         },
@@ -890,7 +905,7 @@ function renderHistoryChart(history) {
                     position: 'left',
                     title: {
                         display: true,
-                        text: 'Daily Solved',
+                        text: 'Problems Solved',
                         color: '#55557a',
                         font: { size: 11, family: 'Inter' },
                     },
@@ -902,20 +917,7 @@ function renderHistoryChart(history) {
                     },
                     grid: { color: 'rgba(42,42,69,0.3)' },
                     stacked: true,
-                },
-                y1: {
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Cumulative',
-                        color: '#6c63ff',
-                        font: { size: 11, family: 'Inter' },
-                    },
-                    ticks: {
-                        color: '#6c63ff',
-                        font: { size: 11 },
-                    },
-                    grid: { drawOnChartArea: false },
+                    suggestedMax: maxDaily + 2,
                 },
             },
         },
