@@ -506,23 +506,23 @@ function updateGoalDisplays() {
         console.log(`[GOALS] Using history baseline: prev(${prevDayEntry.date}) LC=${prevLc}, GFG=${prevGfg}`);
     }
 
-    // Method 2: Cross-check with LC submission calendar (more accurate for LC)
+    // Method 2: LC submission calendar is ONLY used as a fallback.
+    // NOTE: submissionCalendar counts total SUBMISSIONS (including wrong answers,
+    // re-submissions, etc.), NOT unique problems solved. The history diff (Method 1)
+    // based on totalSolved is the accurate count of unique problems solved.
     const calendarToday = getLCTodayFromCalendar();
-    if (calendarToday > 0) {
-        // Calendar is authoritative for LC — it tracks actual accepted submissions
-        // Use the higher of the two methods (calendar vs history diff)
-        if (calendarToday > lcToday) {
-            console.log(`[GOALS] LC calendar (${calendarToday}) > history diff (${lcToday}), using calendar`);
-            lcToday = calendarToday;
-        }
-    }
 
     // Method 3: No previous day at all — first time using CodeTrack
     if (!prevDayEntry) {
-        lcToday = calendarToday; // calendar is our best bet
-        console.log(`[GOALS] No prev day — seeding baseline`);
+        // Use calendar as a rough estimate only when we have no history baseline
+        lcToday = calendarToday;
+        console.log(`[GOALS] No prev day — using calendar fallback (${calendarToday}), seeding baseline`);
         // Seed a yesterday entry so tomorrow's goal tracking works
         seedYesterdayBaseline(lcNow, gfgNow, lcToday);
+    } else {
+        // When we have history, trust the history diff (unique problems solved)
+        // Calendar count is submissions, not problems — don't override
+        console.log(`[GOALS] LC history diff: ${lcToday}, calendar submissions: ${calendarToday} (ignored — submissions ≠ problems)`);
     }
 
     console.log(`[GOALS] FINAL → LC today: ${lcToday}, GFG today: ${gfgToday}`);
@@ -651,18 +651,14 @@ function renderHistory() {
     let weekSolved = 0, bestDay = 0, totalDays = history.length, avgPerDay = 0;
     let trackingStreak = 0;
     const dailyDeltas = [];
-    const calTodayForSummary = (typeof getLCTodayFromCalendar === 'function') ? getLCTodayFromCalendar() : 0;
 
     for (let i = 0; i < history.length; i++) {
         const prev = i > 0 ? history[i - 1] : null;
         let lcDelta  = prev ? Math.max(0, (parseInt(history[i].lc) || 0) - (parseInt(prev.lc) || 0)) : 0;
         const gfgDelta = prev ? Math.max(0, (parseInt(history[i].gfg) || 0) - (parseInt(prev.gfg) || 0)) : 0;
 
-        // For today: use LC calendar if it shows more (API totalSolved may lag)
-        const todayCheck = new Date().toISOString().split('T')[0];
-        if (history[i].date === todayCheck && calTodayForSummary > lcDelta) {
-            lcDelta = calTodayForSummary;
-        }
+        // History diff (totalSolved) is the accurate count of unique problems solved.
+        // submissionCalendar counts submissions, not problems — do NOT override.
 
         const dayTotal = lcDelta + gfgDelta;
         dailyDeltas.push({ date: history[i].date, lcDelta, gfgDelta, dayTotal });
@@ -737,8 +733,6 @@ function renderHistory() {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">
             No history yet. Data is recorded each time you refresh.</td></tr>`;
     } else {
-        const calToday = (typeof getLCTodayFromCalendar === 'function') ? getLCTodayFromCalendar() : 0;
-
         tbody.innerHTML = history.slice().reverse().map((h, i, arr) => {
             const prev  = arr[i + 1];
             const lcVal  = parseInt(h.lc) || 0;
@@ -751,10 +745,8 @@ function renderHistory() {
 
             const isToday = h.date === todayStr;
 
-            // For today: cross-check with LC calendar (API totalSolved may lag behind)
-            if (isToday && calToday > Math.max(0, lcDelta)) {
-                lcDelta = calToday;
-            }
+            // History diff (totalSolved) = unique problems solved.
+            // submissionCalendar counts submissions, not problems — do NOT override.
 
             const dayTotal = Math.max(0, lcDelta) + Math.max(0, gfgDelta);
 
@@ -799,30 +791,23 @@ function renderHistoryChart(history) {
     const labels = [];
     const lcDaily = [];
     const gfgDaily = [];
-    const todayStr = new Date().toISOString().split('T')[0];
-    const calendarToday = (typeof getLCTodayFromCalendar === 'function') ? getLCTodayFromCalendar() : 0;
-
     for (let i = 0; i < history.length; i++) {
         labels.push(formatDate(history[i].date));
         const lcVal  = parseInt(history[i].lc) || 0;
         const gfgVal = parseInt(history[i].gfg) || 0;
 
         if (i === 0) {
-            // First entry — use calendar for today, else 0
-            const isToday = history[i].date === todayStr;
-            lcDaily.push(isToday ? calendarToday : 0);
+            // First entry — no previous data to diff against
+            lcDaily.push(0);
             gfgDaily.push(0);
         } else {
             const prevLc  = parseInt(history[i - 1].lc) || 0;
             const prevGfg = parseInt(history[i - 1].gfg) || 0;
-            let lcDelta = Math.max(0, lcVal - prevLc);
+            const lcDelta = Math.max(0, lcVal - prevLc);
             const gfgDelta = Math.max(0, gfgVal - prevGfg);
 
-            // For today: cross-check with LC calendar (more accurate, updates faster)
-            if (history[i].date === todayStr && calendarToday > lcDelta) {
-                lcDelta = calendarToday;
-            }
-
+            // History diff (totalSolved) = unique problems solved.
+            // submissionCalendar counts submissions, not problems — do NOT override.
             lcDaily.push(lcDelta);
             gfgDaily.push(gfgDelta);
         }
